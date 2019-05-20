@@ -10,8 +10,8 @@ NUM_CLASSES = 12
 def __lcn(image):
 	''' input: image	image in format HWC, with dtype=float
 		output: filtered_img	image in format HWC, with dtype=float'''
-	_mean, _var = tf.nn.moment(x=image, axes=[0,1])
-	filtered_img = (image - _mean)/sqrt(_var)
+	_mean, _var = tf.nn.moments(x=image, axes=[0,1])
+	filtered_img = (image - _mean)/tf.sqrt(_var)
 	return filtered_img
 	
 # read single .png image
@@ -26,22 +26,30 @@ def __read_png_image(img_path):
 def __read_single_example(lab_path, img_path):
 	''' input: lab_path	path to the labeled png image file
 			   img_path	path to the png image file
-		output: label	labeled image
-				image	image '''
+		output: label	labeled image with shape [H,W], dtype=tf.uint8
+				image	image with shape [H,W,3], dtype=tf.float'''
 	# the label is in format HW (dtype=uint8)
 	label = __read_png_image(lab_path)
 	# the image is in format HWC (dtype=uint8)
 	image = __read_png_image(img_path)
+	# reshape and cast type
+	label = tf.reshape(label, shape=(IMAGE_X, IMAGE_Y))
+	image = tf.to_float(image)
 	return label, image
 
 # parse single record from a text file
 def __parse_single_record(record):
 	''' input: record	string tensor (scalar)
-		output: label, image'''
+		output: label --- tensor with shape [H,W], dtype=tf.uint8
+				image --- tensor with shape [H,W,3], dtype=tf.float '''
 	segments = tf.string_split(source=[record], delimiter=' ')
 	lab_path = segments.values[1]
 	img_path = segments.values[0]
-	return __read_single_example(lab_path, img_path)
+	label, image = __read_single_example(lab_path, img_path)
+	# do the LCN
+	image = __lcn(image)
+	# over
+	return label, image
 
 # build a pipeline
 def BuildPipeline(record_path,
