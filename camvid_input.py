@@ -13,7 +13,7 @@ def __lcn(image):
 	_mean, _var = tf.nn.moments(x=image, axes=[0,1])
 	filtered_img = (image - _mean)/tf.sqrt(_var)
 	return filtered_img
-	
+
 # read single .png image
 def __read_png_image(img_path):
 	''' input: img_path	path to the png image file
@@ -33,7 +33,7 @@ def __read_single_example(lab_path, img_path):
 	# the image is in format HWC (dtype=uint8)
 	image = __read_png_image(img_path)
 	# reshape and cast type
-	label = tf.reshape(label, shape=(IMAGE_X, IMAGE_Y))
+	label = tf.reshape(label, shape=(IMAGE_Y, IMAGE_X))
 	image = tf.to_float(image)
 	return label, image
 
@@ -75,4 +75,3 @@ def BuildPipeline(record_path,
 	dataset = dataset.prefetch(buffer_size=1)
 	# over
 	return dataset
-	

@@ -1,11 +1,13 @@
 import os
+import sys
+import getopt
 
 import tensorflow as tf
 import numpy as np
 
 from camvid_input import BuildPipeline
-from segnet_basics import SegnetBasic
-from segnet_basics import loss_func
+from segnet_basic import SegNetBasic
+from segnet_basic import loss_func
 
 from camvid_input import IMAGE_X
 from camvid_input import IMAGE_Y
@@ -55,9 +57,9 @@ with tf.name_scope('input'):
 	labels, images = iterator.get_next()
 	# build placeholder for model input and output
 	# batch of data will be fed to these placeholders
-	input_images = tf.placeholder(tf.float32, shape=(None, IMAGE_X, IMAGE_Y, 3))
-	input_labels = tf.placeholder(tf.uint8, shape=(None, IMAGE_X, IMAGE_Y))
-	
+	input_images = tf.placeholder(tf.float32, shape=(None, IMAGE_Y, IMAGE_X, 3))
+	input_labels = tf.placeholder(tf.uint8, shape=(None, IMAGE_Y, IMAGE_X))
+
 # set global step counter
 global_step = tf.Variable(initial_value=0, trainable=False, name='global_step')
 
@@ -73,14 +75,13 @@ with tf.name_scope('train_and_test'):
 	tf.summary.scalar(name='loss', tensor=loss)
 
 	# evaluate batch accuracy
-	# batch predictions, we reshape and cast it to shape=(batch_size, IMAGE_X*IMAGE_Y), dtype=tf.uint8
-	batch_predict = tf.to_uint8(tf.argmax(tf.nn.softmax(logits_before_softmax), axis=-1))
-	batch_predict = tf.reshape(batch_predict, shape=(None,IMAGE_X*IMAGE_Y))
+	# batch predictions, dtype=tf.float32
+	batch_predict = tf.to_float(tf.argmax(tf.nn.softmax(model.logits_before_softmax), axis=-1))
 	# accuracy
-	batch_acc = tf.reduce_mean(tf.to_float(tf.equal(tf.layers.flatten(labels), batch_predict)))
+	batch_acc = tf.reduce_mean(tf.to_float(tf.equal(tf.to_float(labels), batch_predict)))
 	# summary the batch accuracy
 	tf.summary.scalar(name='batch_acc', tensor=batch_acc)
-	
+
 	# optimize model parameters
 	with tf.name_scope('optimization'):
 		# placeholder to control learning rate
@@ -156,7 +157,7 @@ def test(sess, summary_writer):
 			# for labels and predictions are all N-d arrays, we must flatten them first ...
 			labels_val = labels_val.flatten()
 			batch_predict_val = batch_predict_val.flatten()
-			
+
 			correctness += np.asscalar(np.sum(a=(batch_predict_val==batch_labels), dtype=np.float32))
 			loss_val += np.asscalar(loss_val*cur_batch_size)
 		except tf.errors.OutOfRangeError:
@@ -195,9 +196,9 @@ def update_learning_rate(cur_epoch):
 		cur_lr = lr0/2000
 	# over
 	return cur_lr
-	
-	
-	
+
+
+
 ###################### main entrance ######################
 if __name__ == "__main__":
 	# set tensorboard summary path
@@ -209,7 +210,7 @@ if __name__ == "__main__":
 	for option, value in options:
 		if option == '--logdir':
 			summary_name = value
-	
+
 	# train and test the model
 	cur_lr = lr0
 	best_acc = 0
@@ -217,14 +218,14 @@ if __name__ == "__main__":
 		# initialize variables
 		sess.run(tf.global_variables_initializer())
 		sess.run(tf.local_variables_initializer())
-		
+
 		# initialize IO
 		# build tf saver
 		saver = tf.train.Saver()
 		# build the tensorboard summary
 		summary_writer = tf.summary.FileWriter(summary_path+summary_name)
 		train_summary_op = tf.summary.merge_all()
-		
+
 		# train in epochs
 		for cur_epoch in range(1, num_epochs+1):
 			# print epoch title
@@ -235,7 +236,7 @@ if __name__ == "__main__":
 			cur_acc = test(sess, summary_writer)
 			# update learning rate if necessary
 			cur_lr = update_learning_rate(cur_epoch)
-				
+
 			if cur_acc > best_acc:
 				# save check point
 				saver.save(sess=sess,save_path=model_path+best_model_ckpt)
@@ -249,8 +250,3 @@ if __name__ == "__main__":
 	# finished
 	print('++++++++++++++++++++++++++++++++++++++++')
 	print('best accuracy = %.2f%%.'%(best_acc*100))
-
-
-
-
-
