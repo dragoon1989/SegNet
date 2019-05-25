@@ -13,6 +13,9 @@ from camvid_input import IMAGE_X
 from camvid_input import IMAGE_Y
 from camvid_input import NUM_CLASSES
 
+# set visible CUDA devices
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'		# only use one GPU is enough
+
 # constants
 train_record_path = 'CamVid/train.txt'
 test_record_path = 'CamVid/test.txt'
@@ -20,6 +23,9 @@ val_record_path = 'CamVid/val.txt'
 
 summary_path = './tensorboard/'
 summary_name = 'summary-default'    # tensorboard default summary dir
+
+model_path = './ckpts/'
+best_model_ckpt = 'best.ckpt'		# check point path
 
 train_dataset_size = 367
 test_dataset_size = 233
@@ -70,7 +76,7 @@ with tf.name_scope('segnet_basic_model'):
 # train and test the model
 with tf.name_scope('train_and_test'):
 	# compute loss function
-	loss = loss_func(labels, model.logits_before_softmax)
+	loss = loss_func(input_labels, model.logits_before_softmax)
 	# summary the loss
 	tf.summary.scalar(name='loss', tensor=loss)
 
@@ -78,7 +84,7 @@ with tf.name_scope('train_and_test'):
 	# batch predictions, dtype=tf.float32
 	batch_predict = tf.to_float(tf.argmax(tf.nn.softmax(model.logits_before_softmax), axis=-1))
 	# accuracy
-	batch_acc = tf.reduce_mean(tf.to_float(tf.equal(tf.to_float(labels), batch_predict)))
+	batch_acc = tf.reduce_mean(tf.to_float(tf.equal(tf.to_float(input_labels), batch_predict)))
 	# summary the batch accuracy
 	tf.summary.scalar(name='batch_acc', tensor=batch_acc)
 
@@ -119,7 +125,7 @@ def train(cur_lr, sess, summary_writer, summary_op):
 								   lr : cur_lr})
 			current_batch += 1
 			# print indication info
-			if current_batch % 20 == 0:
+			if current_batch % 4 == 0:
 				msg = '\tbatch number = %d, loss = %.2f, train accuracy = %.2f%%' % \
 						(current_batch, loss_val, batch_acc_val*100)
 				print(msg)
@@ -151,20 +157,20 @@ def test(sess, summary_writer):
 			cur_batch_size = labels_val.shape[0]
 			# test on single batch
 			batch_predict_val, batch_loss_val, global_step_val = \
-						sess.run([batch_predict, total_loss, global_step],
+						sess.run([batch_predict, loss, global_step],
 								 feed_dict={input_labels : labels_val,
 											input_images : images_val})
 			# for labels and predictions are all N-d arrays, we must flatten them first ...
-			labels_val = labels_val.flatten()
-			batch_predict_val = batch_predict_val.flatten()
+			labels_val = labels_val.flatten().astype(np.float32)
+			batch_predict_val = batch_predict_val.flatten().astype(np.float32)
 
-			correctness += np.asscalar(np.sum(a=(batch_predict_val==batch_labels), dtype=np.float32))
-			loss_val += np.asscalar(loss_val*cur_batch_size)
+			correctness += np.asscalar(np.sum(a=(batch_predict_val==labels_val), dtype=np.float32))
+			loss_val += np.asscalar(batch_loss_val*cur_batch_size*IMAGE_X*IMAGE_Y)
 		except tf.errors.OutOfRangeError:
 			break
 	# compute accuracy and loss after a whole epoch
-	current_acc = correctness/test_dataset_size
-	loss_val /= test_set_size
+	current_acc = correctness/test_dataset_size/IMAGE_X/IMAGE_Y
+	loss_val /= test_dataset_size/IMAGE_X/IMAGE_Y
 	# print and summary
 	msg = 'test accuracy = %.2f%%' % (current_acc*100)
 	test_acc_summary = tf.Summary(value=[tf.Summary.Value(tag='test_accuracy',simple_value=current_acc)])

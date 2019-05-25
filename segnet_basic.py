@@ -61,11 +61,11 @@ class SegNetBasic(object):
 		features = keras.layers.Activation('relu')(bn)
 		# 4th pool
 		#features, mask4 = tf_unpool.max_pool_with_argmax(features, 2)
-		features, mask4 = pooling.max_pool_with_argmax(net=features, ksize=[1,2,2,1], strides=[1,2,2,1])
+		#features, mask4 = pooling.max_pool_with_argmax(net=features, ksize=[1,2,2,1], strides=[1,2,2,1])
 
 		# 1st upsample
 		#features = tf_unpool.un_max_pool(features, mask4, 2)
-		features = pooling.unpool(features, mask4, ksize=[1, 2, 2, 1])
+		#features = pooling.unpool(features, mask4, ksize=[1, 2, 2, 1])
 		# 1st 'deconv'
 		deconv1 = keras.layers.Conv2D(filters=64,
 									kernel_size=(7,7), strides=(1,1), padding='SAME',
