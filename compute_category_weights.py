@@ -41,7 +41,7 @@ def __analyze_record__(record_path):
 	return label_paths
 
 # compute categorical data
-def ComputCategoricalData(record_path, categories):
+def ComputeCategoricalData(record_path, categories):
 	'''
 	input: record_path	input record file path
 	       categories	list of legal categories (1-D python list / numpy array)
@@ -63,3 +63,16 @@ def ComputCategoricalData(record_path, categories):
 	med = np.median(freq)
 	# over
 	return freq, med
+
+
+# main entrance
+if __name__ == '__main__':
+	record_path = raw_input('Input the record file path:')
+	num_cat = int(raw_input('Input num of categories:'))
+	categories = [i for i in range(num_cat)]
+	freq, median = ComputeCategoricalData(record_path,categories)
+	# output
+	weights = median/freq
+	np.savetext('weights.txt', weights)
+	# over
+	print('++++++++++++ over ++++++++++++++')

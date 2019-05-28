@@ -8,6 +8,7 @@ import numpy as np
 from camvid_input import BuildPipeline
 from segnet_basic import SegNetBasic
 from segnet_basic import loss_func
+from segnet_basic import weighted_loss_func
 
 from camvid_input import IMAGE_X
 from camvid_input import IMAGE_Y
@@ -20,6 +21,9 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '0'		# only use one GPU is enough
 train_record_path = 'CamVid/train.txt'
 test_record_path = 'CamVid/test.txt'
 val_record_path = 'CamVid/val.txt'
+
+train_weights_path = 'train_weights.txt'
+test_weights_path = 'test_weights.txt'
 
 summary_path = './tensorboard/'
 summary_name = 'summary-default'    # tensorboard default summary dir
@@ -75,8 +79,13 @@ with tf.name_scope('segnet_basic_model'):
 
 # train and test the model
 with tf.name_scope('train_and_test'):
+	# read in the stored weights
+	train_loss_weights = np.loadtext(train_weights_path)
+	test_loss_weights = np.loadtext(test_weights_path)
 	# compute loss function
-	loss = loss_func(input_labels, model.logits_before_softmax)
+	#loss = loss_func(input_labels, model.logits_before_softmax)
+	# compute weighted loss function
+	loss = weighted_loss_func(input_labels, model.logits_before_softmax, train_weights)
 	# summary the loss
 	tf.summary.scalar(name='loss', tensor=loss)
 

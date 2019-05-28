@@ -95,18 +95,31 @@ class SegNetBasic(object):
 									data_format='channels_last', activation=None)(features)
 		# no softmax
 		self.logits_before_softmax = deconv4
-		# softmax along channels
-		#self.logits = keras.layers.Softmax(axis=-1)(deconv4)
 
 # compute loss function (cross entropy in all pixels)
 def loss_func(labels, logits_before_softmax):
 	''' input:	labels --- sparse labels with shape [batch, H, W], dtype = tf.uint8
 				logits_before_softmax --- logits before softmax with shape [batch, H, W, NUM_CLASSES], dtype = tf.float
-		output:	loss --- cross entropy with shape [batch, H, W], dtype = tf.float '''
+		output:	loss --- scalar cross entropy, dtype = tf.float '''
 	batch_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=tf.to_int32(labels),
 												  logits=logits_before_softmax,
 												  name='loss')
 	# reduce the batch loss to a mean scalar
+	loss = tf.reduce_mean(batch_loss)
+	# over
+	return loss
+
+# compute loss function with rebalancing weights
+def weighted_loss_func(labels, logits_before_softmax, weights):
+	''' input:	labels --- sparse labels with shape [batch, H, W], dtype = tf.uint8
+				logits_before_softmax --- logits before softmax with shape [batch, H, W, NUM_CLASSES], dtype = tf.float
+				weights --- numpy 1D array, dtype = np.float32
+		output:	loss --- scalar weighted cross entropy, dtype = tf.float '''
+	# convert input sparse labels to one-hot codes (shape = [batch, H, W, NUM_CLASSES])
+	labels = tf.one_hot(indices=labels, depth=NUM_CLASSES, dtype=tf.float)
+	# compute weighted cross entropy
+	batch_loss = tf.multiply(labels*tf.log(logits_before_softmax), weights)
+	# reduce the batch loss to loss
 	loss = tf.reduce_mean(batch_loss)
 	# over
 	return loss
