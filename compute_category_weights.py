@@ -67,12 +67,13 @@ def ComputeCategoricalData(record_path, categories):
 
 # main entrance
 if __name__ == '__main__':
-	record_path = raw_input('Input the record file path:')
-	num_cat = int(raw_input('Input num of categories:'))
+	record_path = input('Input the record file path:')
+	num_cat = int(input('Input num of categories:'))
 	categories = [i for i in range(num_cat)]
 	freq, median = ComputeCategoricalData(record_path,categories)
 	# output
 	weights = median/freq
-	np.savetext('weights.txt', weights)
+	output_path = input('Specify the output file path:')
+	np.savetxt(output_path, weights)
 	# over
 	print('++++++++++++ over ++++++++++++++')

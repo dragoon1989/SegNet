@@ -2,7 +2,6 @@ import tensorflow as tf
 from tensorflow import keras
 import numpy as np
 
-import tf_unpool
 import pooling
 
 
@@ -113,7 +112,7 @@ def loss_func(labels, logits_before_softmax):
 def weighted_loss_func(labels, logits_before_softmax, weights):
 	''' input:	labels --- sparse labels with shape [batch, H, W], dtype = tf.uint8
 				logits_before_softmax --- logits before softmax with shape [batch, H, W, NUM_CLASSES], dtype = tf.float
-				weights --- numpy 1D array, dtype = np.float32
+				weights --- 1D array, dtype = tf.float32
 		output:	loss --- scalar weighted cross entropy, dtype = tf.float '''
 	# convert input sparse labels to one-hot codes (shape = [batch, H, W, NUM_CLASSES])
 	labels = tf.one_hot(indices=labels, depth=NUM_CLASSES, dtype=tf.float)

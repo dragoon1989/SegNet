@@ -22,8 +22,8 @@ train_record_path = 'CamVid/train.txt'
 test_record_path = 'CamVid/test.txt'
 val_record_path = 'CamVid/val.txt'
 
-train_weights_path = 'train_weights.txt'
-test_weights_path = 'test_weights.txt'
+train_weights_path = 'CamVid/train_weights.txt'
+test_weights_path = 'CamVid/test_weights.txt'
 
 summary_path = './tensorboard/'
 summary_name = 'summary-default'    # tensorboard default summary dir
@@ -79,13 +79,12 @@ with tf.name_scope('segnet_basic_model'):
 
 # train and test the model
 with tf.name_scope('train_and_test'):
-	# read in the stored weights
-	train_loss_weights = np.loadtext(train_weights_path)
-	test_loss_weights = np.loadtext(test_weights_path)
+	# placeholder for loss weights
+	loss_weights = tf.placeholder(tf.float32, shape=[NUM_CLASSES])
 	# compute loss function
 	#loss = loss_func(input_labels, model.logits_before_softmax)
 	# compute weighted loss function
-	loss = weighted_loss_func(input_labels, model.logits_before_softmax, train_weights)
+	loss = weighted_loss_func(input_labels, model.logits_before_softmax, loss_weights)
 	# summary the loss
 	tf.summary.scalar(name='loss', tensor=loss)
 
@@ -108,10 +107,11 @@ with tf.name_scope('train_and_test'):
 									   epsilon=1e-08).minimize(loss, global_step=global_step)
 
 # build the training process
-def train(cur_lr, sess, summary_writer, summary_op):
+def train(cur_lr, train_loss_weights, sess, summary_writer, summary_op):
 	'''
 	input:
 		cur_lr : learning rate for current epoch (scalar)
+		train_loss_weights : loss weights for training set
 		sess : tf session to run the training process
 		summary_writer : summary writer
 		summary_op : summary to write in training process
@@ -131,7 +131,8 @@ def train(cur_lr, sess, summary_writer, summary_op):
 				sess.run([train_op, loss, batch_acc, global_step, summary_op],
 						feed_dict={input_labels : labels_val,
 								   input_images : images_val,
-								   lr : cur_lr})
+								   lr : cur_lr,
+								   loss_weights : train_loss_weights})
 			current_batch += 1
 			# print indication info
 			if current_batch % 4 == 0:
@@ -145,9 +146,10 @@ def train(cur_lr, sess, summary_writer, summary_op):
 	# over
 
 # build the test process
-def test(sess, summary_writer):
+def test(test_loss_weights, sess, summary_writer):
 	'''
 	input :
+		test_loss_weights : loss weights for test set
 		sess : tf session to run the validation
 		summary_writer : summary writer
 		test_summary_op : summary to be writen in test process
@@ -168,7 +170,8 @@ def test(sess, summary_writer):
 			batch_predict_val, batch_loss_val, global_step_val = \
 						sess.run([batch_predict, loss, global_step],
 								 feed_dict={input_labels : labels_val,
-											input_images : images_val})
+											input_images : images_val,
+											loss_weights : test_loss_weights})
 			# for labels and predictions are all N-d arrays, we must flatten them first ...
 			labels_val = labels_val.flatten().astype(np.float32)
 			batch_predict_val = batch_predict_val.flatten().astype(np.float32)
@@ -226,6 +229,9 @@ if __name__ == "__main__":
 		if option == '--logdir':
 			summary_name = value
 
+	# read in the loss weights
+	train_loss_weights = np.loadtxt(train_weights_path)
+	test_loss_weights =np.loadtxt(test_weights_path)
 	# train and test the model
 	cur_lr = lr0
 	best_acc = 0
@@ -246,9 +252,9 @@ if __name__ == "__main__":
 			# print epoch title
 			print('Current epoch No.%d, learning rate = %.2e' % (cur_epoch, cur_lr))
 			# train
-			train(cur_lr, sess, summary_writer, train_summary_op)
+			train(cur_lr, train_loss_weights, sess, summary_writer, train_summary_op)
 			# validate
-			cur_acc = test(sess, summary_writer)
+			cur_acc = test(test_loss_weights, sess, summary_writer)
 			# update learning rate if necessary
 			cur_lr = update_learning_rate(cur_epoch)
 
