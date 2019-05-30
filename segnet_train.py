@@ -184,7 +184,7 @@ def test(test_loss_weights, sess, summary_writer):
 	current_acc = correctness/test_dataset_size/IMAGE_X/IMAGE_Y
 	loss_val /= test_dataset_size/IMAGE_X/IMAGE_Y
 	# print and summary
-	msg = 'test accuracy = %.2f%%' % (current_acc*100)
+	msg = 'test loss = %.2f, with accuracy = %.2f%%' % (loss_val, current_acc*100)
 	test_acc_summary = tf.Summary(value=[tf.Summary.Value(tag='test_accuracy',simple_value=current_acc)])
 	test_loss_summary = tf.Summary(value=[tf.Summary.Value(tag='test_loss', simple_value=loss_val)])
 	# write summary
@@ -220,14 +220,18 @@ def update_learning_rate(cur_epoch):
 ###################### main entrance ######################
 if __name__ == "__main__":
 	# set tensorboard summary path
+	# and load ckpt data if necessary
+	ckpt_path = ''
 	try:
-		options, args = getopt.getopt(sys.argv[1:], '', ['logdir='])
+		options, args = getopt.getopt(sys.argv[1:], '', ['logdir=', 'ckpt='])
 	except getopt.GetoptError:
 		print('invalid arguments!')
 		sys.exit(-1)
 	for option, value in options:
 		if option == '--logdir':
 			summary_name = value
+		elif option == '--ckpt':
+			ckpt_path = value
 
 	# read in the loss weights
 	train_loss_weights = np.loadtxt(train_weights_path)
@@ -236,13 +240,17 @@ if __name__ == "__main__":
 	cur_lr = lr0
 	best_acc = 0
 	with tf.Session() as sess:
-		# initialize variables
-		sess.run(tf.global_variables_initializer())
-		sess.run(tf.local_variables_initializer())
-
-		# initialize IO
 		# build tf saver
 		saver = tf.train.Saver()
+		# load model if necessary
+		if len(ckpt_path)>0:
+			saver.restore(sess, tf.train.latest_checkpoint(ckpt_path))
+		else:
+			# initialize variables
+			sess.run(tf.global_variables_initializer())
+
+		# initialize IO
+		sess.run(tf.local_variables_initializer())
 		# build the tensorboard summary
 		summary_writer = tf.summary.FileWriter(summary_path+summary_name)
 		train_summary_op = tf.summary.merge_all()

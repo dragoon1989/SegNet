@@ -113,11 +113,22 @@ def weighted_loss_func(labels, logits_before_softmax, weights):
 	''' input:	labels --- sparse labels with shape [batch, H, W], dtype = tf.uint8
 				logits_before_softmax --- logits before softmax with shape [batch, H, W, NUM_CLASSES], dtype = tf.float
 				weights --- 1D array, dtype = tf.float32
-		output:	loss --- scalar weighted cross entropy, dtype = tf.float '''
-	# convert input sparse labels to one-hot codes (shape = [batch, H, W, NUM_CLASSES])
-	labels = tf.one_hot(indices=labels, depth=NUM_CLASSES, dtype=tf.float)
+		output:	loss --- scalar weighted cross entropy, dtype = tf.float32 '''
+	# get the NUM_CLASSES
+	num_classes = tf.shape(weights)[0]
+	# flatten the input labels to 1D vector with length =batch*H*W
+	B = tf.shape(labels)[0]
+	H = tf.shape(labels)[1]
+	W = tf.shape(labels)[2]
+	labels = tf.reshape(labels, shape=[B*H*W])
+	# convert input sparse labels to one-hot codes (shape = [B*H*W, NUM_CLASSES])
+	labels = tf.one_hot(indices=labels, depth=num_classes, dtype=tf.float32)
+	# compute logits after softmax
+	logits = tf.nn.softmax(logits_before_softmax)
+	# reshape the logits to [B*H*W, NUM_CLASSES]
+	logits = tf.reshape(logits, shape=[B*H*W, num_classes])
 	# compute weighted cross entropy
-	batch_loss = tf.multiply(labels*tf.log(logits_before_softmax), weights)
+	batch_loss = tf.reduce_sum(-tf.multiply(labels*tf.log(logits + 1e-9), weights),axis=[1])
 	# reduce the batch loss to loss
 	loss = tf.reduce_mean(batch_loss)
 	# over
