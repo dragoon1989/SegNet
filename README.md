@@ -1,2 +1,2 @@
-# SegNet
-study to build and train SegNet from scratch
+# Bayesian SegNet
+study to build and train Bayesian SegNet from scratch
