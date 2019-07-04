@@ -71,19 +71,23 @@ with tf.name_scope('segnet_basic_model'):
 
 # train and test the model
 with tf.name_scope('train_and_test'):
-	# compute loss function
+	# compute loss function (average loss in one batch)
 	loss = loss_func(labels, model.logits_before_softmax)
 	# summary the loss
 	tf.summary.scalar(name='loss', tensor=loss)
 
-	# evaluate batch accuracy
-	batch_sftmax = tf.nn.softmax(model.logits_before_softmax)
-	# batch predictions, dtype=tf.float32
-	batch_predict = tf.to_float(tf.argmax(batch_sftmax, axis=-1))
-	# accuracy
-	batch_acc = tf.reduce_mean(tf.to_float(tf.equal(tf.to_float(labels), batch_predict)))
+	# pixel-wise probability prediction given by the model (output of softmax layer)
+	# shape = (batch_size, H, W, num_classes)
+	prob = tf.nn.softmax(model.logits_before_softmax)
+	
+	# for training process
+	# pixel-wise category predictions, dtype=tf.int32
+	batch_predict = tf.argmax(prob, axis=-1, output_type=tf.int32)
+	# prediction accuracy (average in one batch), dtype=tf.float32
+	batch_acc = tf.reduce_mean(tf.to_float(tf.equal(tf.to_int32(labels), batch_predict)))
 	# summary the batch accuracy
 	tf.summary.scalar(name='batch_acc', tensor=batch_acc)
+	
 
 	# optimize model parameters
 	with tf.name_scope('optimization'):
@@ -144,38 +148,37 @@ def test(sess, summary_writer):
 	test_handle_val = sess.run(test_handle)
 	# initialize iterator
 	sess.run(test_iterator.initializer)
-	# allocate host buffer
-	samples = np.zeros(shape=(test_dataset_size, test_samples, IMAGE_Y, IMAGE_X, NUM_CLASSES), dtype=np.float32)
-	gt = np.zeros(shape=(test_dataset_size, IMAGE_Y, IMAGE_X), dtype=np.float32)
 	# validation loop
 	correctness = 0
 	loss_val = 0
-	idx = 0
+	# test in batches
 	while True:
 		try:
 			# read batch of data from testing set
 			labels_val, images_val = sess.run([labels, images], feed_dict={handle:test_handle_val})
 			cur_batch_size = labels_val.shape[0]
-			
-			# record the gt
-			gt[idx:idx+cur_batch_size,:,:] = labels_val
+			# allocate temp buffer for batch probability prediction
+			cur_prob_pred = np.zeros(shape=(cur_batch_size, IMAGE_Y, IMAGE_X, NUM_CLASSES),dtype=np.float32)
 			# do the MC sampling
 			for i in range(test_samples):
 				# test on single batch
-				batch_sftmax_val, global_step_val = \
-							sess.run([batch_sftmax, global_step],
+				prob_val, global_step_val = \
+							sess.run([prob, global_step],
 									 feed_dict={input_labels : labels_val,
 												input_images : images_val})
-				# record the result
-				samples[idx:idx+cur_batch_size, i, :,:,:] = batch_sftmax_val
+				# update the probability prediction
+				cur_prob_pred += prob_val/test_samples
+				
+			# generate the batch class prediction among all samples
+			cur_class_pred = np.argmax(cur_prob_pred, axis=-1).astype(np.uint8)
+			# compute all correct predictions
+			labels_val = labels_val.flatten().astype(np.uint8)
+			cur_class_pred = cur_class_pred.flatten()
+			correctness += np.asscalar(np.sum(a=(cur_class_pred==labels_val), dtype=np.float32))
 		except tf.errors.OutOfRangeError:
 			break
-	# average over all samples
-	result = np.mean(samples, axis=1, dtype=np.float32)
-	# compute accuracy after a whole epoch
-	result = np.argmax(result, axis=-1)
-	# accuracy
-	current_acc = np.mean((gt == result.astype(np.float32)).astype(np.float32))
+	# compute accuracy in epoch
+	current_acc = correctness/test_dataset_size
 	# print and summary
 	msg = 'test accuracy = %.2f%%' % (current_acc*100)
 	test_acc_summary = tf.Summary(value=[tf.Summary.Value(tag='test_accuracy',simple_value=current_acc)])
