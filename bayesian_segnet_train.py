@@ -95,6 +95,7 @@ with tf.name_scope('train_and_test'):
 	batch_acc = tf.reduce_mean(tf.to_float(tf.equal(tf.to_int32(input_labels), batch_predict)))
 	# summary the batch accuracy
 	tf.summary.scalar(name='batch_acc', tensor=batch_acc)
+	
 
 	# optimize model parameters
 	with tf.name_scope('optimization'):
